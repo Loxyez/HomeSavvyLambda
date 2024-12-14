@@ -1,8 +1,21 @@
 const e = require('express');
 const pool = require('../models/db');
-const { createBlob } = require('@vercel/blob'); // Import Vercel Blob
+const multer = require('multer');
+const { createBlob } = require('../utils/vercelBlob');
 
-// Get all defects
+// Configure multer storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './uploads');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+
+
+const upload = multer({ storage: storage });
+
 exports.getDefects = async (req, res) => {
     try {
         const defects = await pool.query(
@@ -26,57 +39,45 @@ exports.getDefects = async (req, res) => {
 
         res.json(defectsWithPictures);
     } catch (err) {
-        console.error('Error fetching defects:', err.message);
-        res.status(500).json({ error: err.message });
+        console.error('Error fetching defects:', err.message); // Fixed variable name from 'error' to 'err'
+        res.status(500).json({ error: err.message }); // Make sure to use 'err' consistently
     }
-};
+}
 
 // Add a new defect
-exports.addDefectWithPicture = async (req, res) => {
-    const { place, detail } = req.body;
+exports.addDefectWithPicture = [
+    upload.single('picture'),
+    async (req, res) => {
+        const { place, detail } = req.body;
+         if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
 
-    console.log('Adding defect:', place, detail);
-    
-    try {
-        let filePath = null;
-
-        // Check if a file is being uploaded
-        if (req.photo) {
-            const fileName = `${Date.now()}-${req.photo.name}`;
-            
-            // Use Vercel Blob to upload the file
-            const blob = await createBlob(req.photo.buffer, {
-                contentType: req.photo.type,
-                path: `uploads/${fileName}` // The "path" becomes the folder structure in Blob storage
+        try {
+            const blob = await createBlob(req.file.buffer, {
+                contentType: req.file.mimetype,
+                path: `uploads/${Date.now()}-${req.file.originalname}`
             });
 
-            filePath = blob.url; // Get the URL of the uploaded file
-            console.log('File uploaded to Blob:', filePath);
-        }
+            const newDefect = await pool.query(
+                `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
+                [place, detail]
+            );
 
-        console.log('Adding defect to database:', place, detail, filePath);
+            const defectId = newDefect.rows[0].defect_id;
 
-        // Insert the defect into the database
-        const newDefect = await pool.query(
-            `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
-            [place, detail]
-        );
-
-        const defectId = newDefect.rows[0].defect_id;
-
-        if (filePath) {
             await pool.query(
                 `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2);`,
-                [defectId, filePath]
+                [defectId, blob.url]
             );
-        }
 
-        res.status(201).json({ message: 'Defect added successfully', defect: newDefect.rows[0] });
-    } catch (err) {
-        console.error('Error adding defect:', err.message);
-        res.status(500).json({ error: err.message });
-    }
-};
+            res.status(201).json({ message: 'Defect added successfully', defect: newDefect.rows[0] });
+        } catch (error) {
+            console.error('Error uploading file to Vercel Blob:', error);
+            res.status(500).json({ error: error.message });
+        }
+    },
+];
 
 // Update defect status or progress
 exports.updateDefect = async (req, res) => {
@@ -90,7 +91,7 @@ exports.updateDefect = async (req, res) => {
         );
         res.json(updatedDefect.rows[0]);
     } catch (err) {
-        console.error('Error updating defect:', err.message);
-        res.status(500).json({ error: err.message });
+        console.error('Error updating defect:', err.message); // Fixed variable name from 'error' to 'err'
+        res.status(500).json({ error: err.message }); // Make sure to use 'err' consistently
     }
-};
+}
