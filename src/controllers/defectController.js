@@ -3,6 +3,19 @@ const pool = require('../models/db');
 const multer = require('multer');
 const { createBlob } = require('@vercel/blob');
 
+// Configure multer storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './uploads');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+
+
+const upload = multer({ storage: storage });
+
 exports.getDefects = async (req, res) => {
     try {
         const defects = await pool.query(
@@ -33,6 +46,7 @@ exports.getDefects = async (req, res) => {
 
 // Add a new defect
 exports.addDefectWithPicture = [
+    upload.single('picture'),
     async (req, res) => {
         const { place, detail } = req.body;
          if (!req.file) {
