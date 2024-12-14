@@ -40,11 +40,11 @@ exports.addDefectWithPicture = async (req, res) => {
 
         // Check if a file is being uploaded
         if (req.file) {
-            const fileName = `${Date.now()}-${req.file.originalname}`;
+            const fileName = `${Date.now()}-${req.file.name}`;
             
             // Use Vercel Blob to upload the file
-            const blob = await createBlob(req.file.buffer, {
-                contentType: req.file.mimetype,
+            const blob = await createBlob(req.photo.buffer, {
+                contentType: req.photo.type,
                 path: `uploads/${fileName}` // The "path" becomes the folder structure in Blob storage
             });
 
