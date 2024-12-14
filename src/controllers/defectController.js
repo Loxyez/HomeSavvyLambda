@@ -1,20 +1,5 @@
-const e = require('express');
 const pool = require('../models/db');
-const multer = require('multer');
 const { createBlob } = require('@vercel/blob');
-
-// Configure multer storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, './uploads');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
-    }
-});
-
-
-const upload = multer({ storage: storage });
 
 exports.getDefects = async (req, res) => {
     try {
@@ -45,39 +30,36 @@ exports.getDefects = async (req, res) => {
 }
 
 // Add a new defect
-exports.addDefectWithPicture = [
-    upload.single('picture'),
-    async (req, res) => {
-        const { place, detail } = req.body;
-         if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
+exports.addDefectWithPicture = async (req, res) => {
+    const { place, detail } = req.body;
+        if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-        try {
-            const blob = await createBlob(req.file.buffer, {
-                contentType: req.file.mimetype,
-                path: `uploads/${Date.now()}-${req.file.originalname}`
-            });
+    try {
+        const blob = await createBlob(req.file.buffer, {
+            contentType: req.file.mimetype,
+            path: `uploads/${Date.now()}-${req.file.originalname}`
+        });
 
-            const newDefect = await pool.query(
-                `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
-                [place, detail]
-            );
+        const newDefect = await pool.query(
+            `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
+            [place, detail]
+        );
 
-            const defectId = newDefect.rows[0].defect_id;
+        const defectId = newDefect.rows[0].defect_id;
 
-            await pool.query(
-                `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2);`,
-                [defectId, blob.url]
-            );
+        await pool.query(
+            `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2);`,
+            [defectId, blob.url]
+        );
 
-            res.status(201).json({ message: 'Defect added successfully', defect: newDefect.rows[0] });
-        } catch (error) {
-            console.error('Error uploading file to Vercel Blob:', error);
-            res.status(500).json({ error: error.message });
-        }
-    },
-];
+        res.status(201).json({ message: 'Defect added successfully', defect: newDefect.rows[0] });
+    } catch (error) {
+        console.error('Error uploading file to Vercel Blob:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
 
 // Update defect status or progress
 exports.updateDefect = async (req, res) => {
