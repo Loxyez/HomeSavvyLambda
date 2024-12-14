@@ -32,7 +32,8 @@ exports.getDefects = async (req, res) => {
             );
         
         const defectsWithPictures = defects.rows.map(defect => {
-            defect.pictures = defect.pictures.map(picture => `${picture}`);
+            // Ensure `pictures` is an array, even if it was `null` or not set
+            defect.pictures = Array.isArray(defect.pictures) ? defect.pictures : [];
             return defect;
         });
 
