@@ -1,7 +1,7 @@
 const e = require('express');
 const pool = require('../models/db');
 const multer = require('multer');
-const { createBlob } = require('../utils/vercelBlob');
+const { createBlob } = require('@vercel/blob');
 
 // Configure multer storage
 const storage = multer.diskStorage({
