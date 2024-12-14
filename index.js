@@ -4,14 +4,14 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs'); // Import the file system module
+const fs = require('fs');
 const defectRoutes = require('./src/routes/defectRoutes');
 
 // Initialize express app
 const app = express();
 
-// Path to the uploads directory
-const uploadsPath = path.join(__dirname, 'uploads');
+// Path to the uploads directory in /tmp for serverless environments
+const uploadsPath = path.join('/tmp', 'uploads');
 
 // Check if the folder exists, and if not, create it
 if (!fs.existsSync(uploadsPath)) {
