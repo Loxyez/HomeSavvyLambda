@@ -34,12 +34,14 @@ exports.getDefects = async (req, res) => {
 // Add a new defect
 exports.addDefectWithPicture = async (req, res) => {
     const { place, detail } = req.body;
+
+    console.log('Adding defect:', place, detail);
     
     try {
         let filePath = null;
 
         // Check if a file is being uploaded
-        if (req.file) {
+        if (req.photo) {
             const fileName = `${Date.now()}-${req.photo.name}`;
             
             // Use Vercel Blob to upload the file
@@ -51,6 +53,8 @@ exports.addDefectWithPicture = async (req, res) => {
             filePath = blob.url; // Get the URL of the uploaded file
             console.log('File uploaded to Blob:', filePath);
         }
+
+        console.log('Adding defect to database:', place, detail, filePath);
 
         // Insert the defect into the database
         const newDefect = await pool.query(
