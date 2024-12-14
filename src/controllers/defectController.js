@@ -32,7 +32,7 @@ exports.getDefects = async (req, res) => {
 // Add a new defect
 exports.addDefectWithPicture = async (req, res) => {
     const { place, detail } = req.body;
-        if (!req.file) {
+    if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
