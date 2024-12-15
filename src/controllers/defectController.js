@@ -1,5 +1,5 @@
 const pool = require('../models/db');
-const { createBlob } = require('@vercel/blob');
+const { createUploadUrl } = require('@vercel/blob');
 const multer = require('multer');
 
 const storage = multer.memoryStorage(); // Store in memory (since you're using Vercel Blob)
@@ -37,33 +37,32 @@ exports.addDefectWithPicture = async (req, res) => {
     try {
         const { place, detail } = req.body;
 
+        // 1️⃣ Insert new defect into the database
         const newDefect = await pool.query(
             `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
             [place, detail]
         );
-
         const defectId = newDefect.rows[0].defect_id;
 
-        if (req.file) {
-            const blob = await createBlob(req.file.buffer, {
-                access: 'public',
-                contentType: req.file.mimetype,
-            });
+        // 2️⃣ Generate an upload URL for the picture
+        const { url } = await createUploadUrl();
 
-            const file_path = blob.url;
+        // 3️⃣ Store the URL in the "picture" table for this defect
+        await pool.query(
+            `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2) RETURNING *;`,
+            [defectId, url]
+        );
 
-            await pool.query(
-                `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2);`,
-                [defectId, file_path]
-            );
-        }
-
-        res.status(201).json(newDefect.rows[0]);
+        // 4️⃣ Return the defect, file path, and upload URL to frontend
+        res.status(201).json({
+            defect: newDefect.rows[0],
+            uploadUrl: url // Return this URL to the frontend
+        });
     } catch (err) {
         console.error('Error adding defect:', err.message);
         res.status(500).json({ error: err.message });
     }
-}
+};
 
 // Update defect status or progress
 exports.updateDefect = async (req, res) => {
