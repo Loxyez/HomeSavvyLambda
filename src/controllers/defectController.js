@@ -1,5 +1,9 @@
 const pool = require('../models/db');
 const { createBlob } = require('@vercel/blob');
+const multer = require('multer');
+
+const storage = multer.memoryStorage(); // Store in memory (since you're using Vercel Blob)
+const upload = multer({ storage: storage });
 
 exports.getDefects = async (req, res) => {
     try {
@@ -29,18 +33,9 @@ exports.getDefects = async (req, res) => {
     }
 }
 
-// Add a new defect
 exports.addDefectWithPicture = async (req, res) => {
-    const { place, detail } = req.body;
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-    }
-
     try {
-        const blob = await createBlob(req.file.buffer, {
-            contentType: req.file.mimetype,
-            path: `uploads/${Date.now()}-${req.file.originalname}`
-        });
+        const { place, detail } = req.body;
 
         const newDefect = await pool.query(
             `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
@@ -49,15 +44,24 @@ exports.addDefectWithPicture = async (req, res) => {
 
         const defectId = newDefect.rows[0].defect_id;
 
-        await pool.query(
-            `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2);`,
-            [defectId, blob.url]
-        );
+        if (req.file) {
+            const blob = await createBlob(req.file.buffer, {
+                access: 'public',
+                contentType: req.file.mimetype,
+            });
 
-        res.status(201).json({ message: 'Defect added successfully', defect: newDefect.rows[0] });
-    } catch (error) {
-        console.error('Error uploading file to Vercel Blob:', error);
-        res.status(500).json({ error: error.message });
+            const file_path = blob.url;
+
+            await pool.query(
+                `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2);`,
+                [defectId, file_path]
+            );
+        }
+
+        res.status(201).json(newDefect.rows[0]);
+    } catch (err) {
+        console.error('Error adding defect:', err.message);
+        res.status(500).json({ error: err.message });
     }
 }
 
