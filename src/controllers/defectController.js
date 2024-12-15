@@ -1,5 +1,5 @@
 const pool = require('../models/db');
-const { createUploadUrl } = require('@vercel/blob');
+const { put } = require('@vercel/blob');
 const multer = require('multer');
 
 const storage = multer.memoryStorage(); // Store in memory (since you're using Vercel Blob)
@@ -35,28 +35,39 @@ exports.getDefects = async (req, res) => {
 
 exports.addDefectWithPicture = async (req, res) => {
     try {
-        const { place, detail } = req.body;
+        console.log('Request body:', req.body); // Log form data
+        console.log('Uploaded file:', req.file); // Log file details
 
-        // 1️⃣ Insert new defect into the database
+        const { place, detail } = req.body; // Get form data
+
         const newDefect = await pool.query(
             `INSERT INTO defects (place, detail) VALUES ($1, $2) RETURNING *;`,
             [place, detail]
         );
+
         const defectId = newDefect.rows[0].defect_id;
 
-        // 2️⃣ Generate an upload URL for the picture
-        const { url } = await createUploadUrl();
+        const file = req.file;
+        if (!file) {
+            throw new Error('File is required for upload.');
+        }
 
-        // 3️⃣ Store the URL in the "picture" table for this defect
+        const url = `uploads/${Date.now()}-${file.originalname}`; // Optional unique filename
+
+        const blob = await put(url, file.buffer, {
+            access: 'public', // Make file publicly accessible
+            contentType: file.mimetype // Set file's MIME type (e.g., image/png, image/jpeg)
+        });
+
         await pool.query(
             `INSERT INTO picture (defect_id, file_path) VALUES ($1, $2) RETURNING *;`,
-            [defectId, url]
+            [defectId, blob.url] // Store the public URL returned by Vercel Blob
         );
 
-        // 4️⃣ Return the defect, file path, and upload URL to frontend
         res.status(201).json({
+            message: 'Defect created successfully',
             defect: newDefect.rows[0],
-            uploadUrl: url // Return this URL to the frontend
+            fileUrl: blob.url // Return the URL for frontend use
         });
     } catch (err) {
         console.error('Error adding defect:', err.message);
